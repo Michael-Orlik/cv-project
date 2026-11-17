@@ -105,6 +105,12 @@ def main() -> int:
     )
 
     parser.add_argument(
+        "--recognize-page",
+        action="store_true",
+        help="Recognize all text lines detected during page segmentation.",
+    )
+
+    parser.add_argument(
         "--lines-output",
         type=Path,
         help="Directory for automatically cropped line images.",
@@ -112,6 +118,10 @@ def main() -> int:
 
     # Parse command-line arguments into named values.
     args = parser.parse_args()
+
+    # Page recognition uses the line regions found during segmentation.
+    if args.recognize_page and not args.segment_page:
+        parser.error("--recognize-page requires --segment-page.")
 
     # Manual cropping and automatic segmentation are separate modes.
     if args.segment_page and args.prepare_ocr:
@@ -190,6 +200,54 @@ def main() -> int:
 
         print(f"Saved lines: {len(boxes)}")
         print(f"Lines output: {args.lines_output}")
+
+        if args.recognize_page:
+            if not boxes:
+                print("No text lines found.")
+                return 0
+
+            try:
+                from recognize import load_recognizer, recognize_line
+
+                # Load one processor and model for all lines on this page.
+                processor, model = load_recognizer()
+            except (OSError, ValueError, RuntimeError) as error:
+                print(
+                    f"Error: cannot load OCR resources: {error}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            print("Page OCR resources ready.")
+
+            recognized_lines = []
+
+            for index, (left, top, right, bottom) in enumerate(boxes, start=1):
+                try:
+                    # Read RGB pixels from the current page using detected bounds.
+                    line_image = crop_image(
+                        image,
+                        left=left,
+                        top=top,
+                        right=right,
+                        bottom=bottom,
+                    )
+
+                    # Reuse the same processor and model for every line.
+                    text = recognize_line(line_image, processor, model)
+
+                except (ValueError, RuntimeError) as error:
+                    print(
+                        f"Error: cannot recognize line {index}: {error}",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+                recognized_lines.append(text)
+                print(f"Line {index}: {text}")
+
+            print(f"Recognized lines: {len(recognized_lines)}")
+
         return 0
 
     # RGB fragment preparation.

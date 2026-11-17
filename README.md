@@ -7,7 +7,8 @@ orientation and composites transparency over a white background.
 It converts images to RGB and grayscale arrays and displays their metadata.
 It can also export a binary PNG using Otsu or adaptive Gaussian thresholding.
 
-The application can recognize a manually cropped English handwritten line.
+The application can recognize English handwritten lines, either manually
+cropped or detected automatically on a single-column page.
 Markdown export is planned for a later stage.
 
 ## Requirements
@@ -135,12 +136,30 @@ The program saves files named `line-01.png`, `line-02.png`, and so on,
 ordered from top to bottom.
 
 This experimental method uses horizontal pixel density and assumes
-a single-column page. Each crop spans the full image width.
+a single-column page. Left and right bounds are estimated from dark regions
+in each candidate band, with a small margin around the detected text.
+Weak isolated marks and edge artifacts are filtered when choosing the bounds.
 Inspect the crops before recognition: boundaries may cut letter strokes
-or include parts of neighboring lines.
+or include parts of neighboring lines. Faint text and small isolated marks
+can also be missed.
 
-This mode saves images only. Page recognition and Markdown export
-are planned for a later stage.
+This mode saves images only.
+
+## Page recognition
+
+Recognize the detected lines using one model loaded for the whole page:
+
+```bash
+uv run python main.py note.jpg result.md \
+    --segment-page --recognize-page --lines-output output/lines
+```
+
+The program prints each line in reading order. Only regions detected in the
+current run are recognized; existing files in the output directory are not
+used as input. Review the text against the source image, especially numbers,
+punctuation, short lines, and handwritten corrections.
+
+Markdown export is planned for a later stage.
 
 ## Tests
 

@@ -1,8 +1,7 @@
 """Prepare image masks and locate text lines."""
 
-import numpy as np
 import cv2
-
+import numpy as np
 from numpy.typing import NDArray
 
 from image_ops import to_grayscale
@@ -269,12 +268,82 @@ def resolve_band_overlaps(
     return separated_bands
 
 
+def find_horizontal_bounds(
+    mask: NDArray[np.uint8],
+    grayscale: NDArray[np.uint8],
+    padding: int = 10,
+) -> tuple[int, int]:
+    """Estimate text columns from dark regions and add a small margin.
+
+    Return the full width if no suitable regions remain.
+
+    Raises:
+        ValueError: If the image arrays or padding are invalid.
+    """
+    if (
+        mask.ndim != 2
+        or mask.size == 0
+        or mask.dtype != np.uint8
+        or grayscale.shape != mask.shape
+        or grayscale.dtype != np.uint8
+    ):
+        raise ValueError("Expected matching non-empty 2D uint8 arrays.")
+    if not isinstance(padding, int) or padding < 0:
+        raise ValueError("Padding must be a non-negative integer.")
+
+    height, width = mask.shape
+    brightness_limit, _ = cv2.threshold(
+        grayscale, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU
+    )
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+
+    components = []
+    for label, (x, y, w, h, area) in enumerate(stats[1:], start=1):
+        if area < max(6, height // 10) or h < 3 or w < 2:
+            continue
+
+        # Exclude faint regions, such as writing showing through the paper.
+        region = labels[y:y + h, x:x + w] == label
+        pixels = grayscale[y:y + h, x:x + w][region]
+        if np.median(pixels) <= brightness_limit:
+            components.append((int(x), int(x + w), int(area), int(h)))
+
+    if not components:
+        return 0, width
+
+    # Group nearby characters while allowing spaces between words.
+    max_gap = max(20, int(np.median([part[3] for part in components]) * 2.5))
+    groups = []
+    for left, right, area, _ in sorted(components):
+        if groups and left - groups[-1][1] <= max_gap:
+            groups[-1][1] = max(groups[-1][1], right)
+            groups[-1][2] += area
+        else:
+            groups.append([left, right, area])
+
+    largest_area = max(group[2] for group in groups)
+    edge_margin = max(2, width // 20)
+    text_groups = []
+    for left, right, area in groups:
+        # Ignore small isolated marks and weak edge groups such as binding holes.
+        near_edge = left < edge_margin or right > width - edge_margin
+        if area < largest_area * 0.02:
+            continue
+        if near_edge and area < largest_area * 0.2:
+            continue
+        text_groups.append((left, right))
+
+    left = max(0, min(group[0] for group in text_groups) - padding)
+    right = min(width, max(group[1] for group in text_groups) + padding)
+    return left, right
+
+
 def find_line_boxes(
     image: NDArray[np.uint8],
     threshold: float = 0.06,
     padding: int = 40,
 ) -> list[tuple[int, int, int, int]]:
-    """Find approximate full-width text-line boxes on a single-column page.
+    """Find approximate text-line boxes on a single-column page.
 
     Return (left, top, right, bottom) boxes ordered from top to bottom.
     Right and bottom are excluded. Return an empty list if no bands are found.
@@ -294,16 +363,21 @@ def find_line_boxes(
     bands = find_line_bands(smoothed_density, threshold=threshold)
 
     # Expand the bands and separate any overlapping neighbors.
-    height, width = image.shape[:2]
+    height = image.shape[0]
     expanded_bands = expand_line_bands(bands, height, padding=padding)
     separated_bands = resolve_band_overlaps(
         expanded_bands,
         smoothed_density,
     )
 
-    # Use the full image width for each candidate line.
+    # Estimate columns from each dense text band, excluding neighboring rows.
+    grayscale_image = to_grayscale(image)
     boxes = []
-    for top, bottom in separated_bands:
-        boxes.append((0, top, width, bottom))
+    for (band_top, band_bottom), (top, bottom) in zip(bands, separated_bands):
+        left, right = find_horizontal_bounds(
+            filtered_mask[band_top:band_bottom],
+            grayscale_image[band_top:band_bottom],
+        )
+        boxes.append((left, top, right, bottom))
 
     return boxes
