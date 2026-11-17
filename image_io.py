@@ -29,3 +29,10 @@ def load_image(path: Path) -> NDArray[np.uint8]:
     array = np.array(rgb_image, dtype=np.uint8, copy=True)
     # Return the array.
     return array
+
+
+def save_image(image: NDArray[np.uint8], path: Path) -> None:
+    """Save an image array as a PNG file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pil_image = Image.fromarray(image)
+    pil_image.save(path, format="PNG")

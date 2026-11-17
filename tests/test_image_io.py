@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from PIL import ExifTags, Image, UnidentifiedImageError
 
-from image_io import load_image
+from image_io import load_image, save_image
 
 
 def test_load_image_returns_rgb_array(tmp_path):
@@ -127,3 +127,15 @@ def test_load_image_rejects_unsupported_format(tmp_path):
 
     with pytest.raises(ValueError, match="^Unsupported image format: GIF$"):
         load_image(path)
+
+
+def test_save_image_writes_binary_png_in_nested_directory(tmp_path):
+    """Create parent directories and preserve the binary pixel values."""
+    image = np.array([[0, 255], [255, 0]], dtype=np.uint8)
+    path = tmp_path / "nested" / "binary.png"
+
+    save_image(image, path)
+
+    with Image.open(path) as saved_image:
+        assert saved_image.format == "PNG"
+        np.testing.assert_array_equal(np.array(saved_image), image)
