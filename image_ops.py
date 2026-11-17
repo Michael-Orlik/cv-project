@@ -6,7 +6,12 @@ SUPPORTED_NDIMS = (2, 3)
 
 
 def to_grayscale(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
-    """Convert an RGB array to an independent grayscale array."""
+    """Convert an RGB uint8 image to a separate grayscale array.
+
+    Raises:
+        ValueError: If the image is empty, is not uint8, or does not have
+            shape (height, width, 3).
+    """
     if image.ndim != 3:
         raise ValueError("Expected a three-dimensional image.")
     if image.shape[2] != 3:
@@ -32,7 +37,14 @@ def crop_image(
     right: int,
     bottom: int,
 ) -> NDArray[np.uint8]:
-    """Return an independent rectangular crop of an image."""
+    """Copy a rectangular region from a grayscale or RGB image.
+
+    Right and bottom are exclusive. The source image is unchanged.
+
+    Raises:
+        ValueError: If the image shape, dtype, or crop bounds are invalid.
+        TypeError: If coordinates cannot be used as slice indices.
+    """
     if image.ndim not in SUPPORTED_NDIMS:
         raise ValueError("Expected a two- or three-dimensional image.")
     if image.dtype != np.uint8:

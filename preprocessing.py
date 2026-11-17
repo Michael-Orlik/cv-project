@@ -4,7 +4,11 @@ from numpy.typing import NDArray
 
 
 def binarize(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
-    """Convert a uint8 grayscale image to a binary mask using Otsu."""
+    """Convert a grayscale uint8 image to 0 and 255 using Otsu.
+
+    Raises:
+        cv2.error: If OpenCV rejects the image format or data.
+    """
     # Otsu selects one threshold for the entire image.
     _, binary_image = cv2.threshold(
         image,
@@ -20,7 +24,16 @@ def binarize_adaptive(
     block_size: int = 51,
     c: float = 10.0,
 ) -> NDArray[np.uint8]:
-    """Binarize a grayscale image using local Gaussian thresholds."""
+    """Convert a grayscale uint8 image to 0 and 255 using local thresholds.
+
+    block_size is the local window size; c is subtracted from its weighted mean.
+
+    Raises:
+        ValueError: If block_size is not an odd integer of at least 3,
+            or c is not finite.
+        TypeError: If c cannot be checked for finiteness.
+        cv2.error: If OpenCV rejects the image or threshold parameters.
+    """
     if not isinstance(block_size, int):
         raise ValueError("Block size must be an integer.")
     if block_size < 3 or block_size % 2 == 0:

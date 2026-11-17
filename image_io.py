@@ -9,7 +9,14 @@ SUPPORTED_FORMATS = ("JPEG", "PNG")
 
 
 def load_image(path: Path) -> NDArray[np.uint8]:
-    """Load an image as an independent RGB array."""
+    """Load JPEG or PNG as an RGB array, applying EXIF orientation.
+
+    Transparent pixels are placed over a white background.
+
+    Raises:
+        OSError: If the file is missing, unreadable, or not a valid image.
+        ValueError: If the detected format is not JPEG or PNG.
+    """
     # Open the image using a context manager.
     with Image.open(path) as image:
         if image.format not in SUPPORTED_FORMATS:
@@ -32,7 +39,15 @@ def load_image(path: Path) -> NDArray[np.uint8]:
 
 
 def save_image(image: NDArray[np.uint8], path: Path) -> None:
-    """Save an image array as a PNG file."""
+    """Save an array as PNG and create missing parent directories.
+
+    An existing destination file is overwritten.
+
+    Raises:
+        OSError: If the directory cannot be created or the file cannot be saved.
+        TypeError: If Pillow does not support the array's dtype or channels.
+        ValueError: If the image dimensions are invalid.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     pil_image = Image.fromarray(image)
     pil_image.save(path, format="PNG")
