@@ -1,14 +1,16 @@
 import argparse
 import sys
-from pathlib import Path
+import cv2
 
+from pathlib import Path
 from image_io import load_image, save_image
 from image_ops import crop_image, to_grayscale
 from preprocessing import binarize, binarize_adaptive
+from segment import find_line_boxes
 
 
 def main() -> int:
-    """Run image preprocessing or prepare a text line for OCR.
+    """Run image preprocessing, page segmentation, or line recognition.
 
     Returns
     -------
@@ -26,7 +28,7 @@ def main() -> int:
     Line recognition is optional. Markdown export is not implemented yet.
     """
     parser = argparse.ArgumentParser(
-        description="Preprocess an image or prepare a text line for OCR."
+        description="Preprocess images, segment a page, or recognize a text line."
     )
 
     # Positional arguments are assigned in the order they are declared.
@@ -96,8 +98,31 @@ def main() -> int:
         help="Path to save the cropped RGB line as PNG.",
     )
 
+    parser.add_argument(
+        "--segment-page",
+        action="store_true",
+        help="Detect text-line regions and save their RGB crops.",
+    )
+
+    parser.add_argument(
+        "--lines-output",
+        type=Path,
+        help="Directory for automatically cropped line images.",
+    )
+
     # Parse command-line arguments into named values.
     args = parser.parse_args()
+
+    # Manual cropping and automatic segmentation are separate modes.
+    if args.segment_page and args.prepare_ocr:
+        parser.error("--segment-page and --prepare-ocr cannot be used together.")
+
+    # Automatic segmentation requires a destination directory
+    if args.segment_page:
+        if args.lines_output is None:
+            parser.error("--segment-page requires --lines-output.")
+    elif args.lines_output is not None:
+        parser.error("--lines-output requires --segment-page.")
 
     # Recognition requires the crop and model created during preparation.
     if args.recognize_line and not args.prepare_ocr:
@@ -133,6 +158,39 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+
+    if args.segment_page:
+        try:
+            boxes = find_line_boxes(image)
+
+            for index, (left, top, right, bottom) in enumerate(boxes, start=1):
+                # Crop RGB pixels from the source image using detected bounds.
+                line_image = crop_image(
+                    image,
+                    left=left,
+                    top=top,
+                    right=right,
+                    bottom=bottom,
+                )
+
+                line_path = args.lines_output / f"line-{index:02d}.png"
+
+                # Prevent a generated crop from overwriting the source image.
+                if line_path.exists() and line_path.samefile(args.input_image):
+                    raise ValueError("Line output must differ from input image.")
+
+                save_image(line_image, line_path)
+
+        except (ValueError, OSError, cv2.error) as error:
+            print(
+                f"Error: cannot segment page or save line images: {error}",
+                file=sys.stderr,
+            )
+            return 1
+
+        print(f"Saved lines: {len(boxes)}")
+        print(f"Lines output: {args.lines_output}")
+        return 0
 
     # RGB fragment preparation.
     if args.prepare_ocr:

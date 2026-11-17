@@ -122,6 +122,26 @@ The recognized text is printed after `Recognized text:`.
 Recognition may contain errors, including missing punctuation.
 Markdown export is planned for a later stage.
 
+## Page segmentation
+
+Detect candidate text lines and save their RGB crops:
+
+```bash
+uv run python main.py note.jpg result.md \
+    --segment-page --lines-output output/lines
+```
+
+The program saves files named `line-01.png`, `line-02.png`, and so on,
+ordered from top to bottom.
+
+This experimental method uses horizontal pixel density and assumes
+a single-column page. Each crop spans the full image width.
+Inspect the crops before recognition: boundaries may cut letter strokes
+or include parts of neighboring lines.
+
+This mode saves images only. Page recognition and Markdown export
+are planned for a later stage.
+
 ## Tests
 
 Run all tests from the project root:
