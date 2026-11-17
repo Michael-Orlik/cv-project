@@ -83,6 +83,33 @@ Compare the saved image with the Otsu result. Adaptive thresholding can reduce
 black shadow regions. Notebook grid lines and small background artifacts may
 still appear in the output.
 
+## OCR preparation
+
+Crop one RGB text line and load the TrOCR processor and model:
+
+```bash
+uv run python main.py note.jpg result.md --prepare-ocr \
+    --crop 145 50 1800 185 --line-output output/line.png
+```
+
+Choose crop coordinates for your image after EXIF orientation.
+The order is left, top, right, bottom; right and bottom are exclusive.
+Inspect the saved PNG to confirm that the complete line is visible.
+
+The first run downloads checkpoint files to the Hugging Face cache.
+Later runs reuse cached files.
+
+- Model: `microsoft/trocr-base-handwritten`
+- Revision: `eaacaf452b06415df8f10bb6fad3a4c11e609406`
+- Device: CPU
+- Model dtype: float32
+- Evaluation mode enabled
+
+This checkpoint is intended for English handwritten text lines.
+Successful preparation ends with `OCR resources ready.`
+
+Text recognition and Markdown export are planned for the next stage.
+
 ## Tests
 
 Run all tests from the project root:
