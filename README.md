@@ -5,7 +5,7 @@ A Python application for converting images of handwritten text into Markdown.
 The current implementation loads JPEG and PNG images, applies EXIF
 orientation and composites transparency over a white background.
 It converts images to RGB and grayscale arrays and displays their metadata.
-It can also export a binary PNG using Otsu's automatic thresholding.
+It can also export a binary PNG using Otsu or adaptive Gaussian thresholding.
 
 Handwriting recognition and Markdown export are planned for later stages.
 
@@ -63,6 +63,25 @@ The parent directory is created as needed. The program reports the saved path.
 Otsu uses one global threshold for the entire image. Uneven lighting can turn
 shadows into black regions, and notebook grid lines can appear in the mask.
 Inspect the result before using it for text-line segmentation.
+
+## Adaptive thresholding
+
+Use local Gaussian thresholds to process an image with uneven lighting.
+
+```bash
+uv run python main.py note.jpg result.md --method adaptive \
+    --block-size 51 --c 10 --binary-output output/adaptive.png
+```
+
+- `--method` selects `otsu` or `adaptive`. The default is `otsu`.
+- `--block-size` sets the local window size. It must be an odd integer of
+  at least 3. The default is 51.
+- `--c` is the finite constant subtracted from the local weighted mean.
+  The default is 10.
+
+Compare the saved image with the Otsu result. Adaptive thresholding can reduce
+black shadow regions. Notebook grid lines and small background artifacts may
+still appear in the output.
 
 ## Tests
 

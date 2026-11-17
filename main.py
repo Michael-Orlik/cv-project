@@ -4,7 +4,7 @@ from pathlib import Path
 
 from image_io import load_image, save_image
 from image_ops import to_grayscale
-from preprocessing import binarize
+from preprocessing import binarize, binarize_adaptive
 
 
 def main() -> int:
@@ -29,6 +29,27 @@ def main() -> int:
         "--binary-output",
         type=Path,
         help="Path to save the binary PNG image.",
+    )
+
+    parser.add_argument(
+        "--method",
+        choices=("otsu", "adaptive"),
+        default="otsu",
+        help="Binarization method.",
+    )
+
+    parser.add_argument(
+        "--block-size",
+        type=int,
+        default=51,
+        help="Odd window size for adaptive thresholding.",
+    )
+
+    parser.add_argument(
+        "--c",
+        type=float,
+        default=10.0,
+        help="Constant subtracted from the local threshold.",
     )
 
     # Parse command-line arguments into named values.
@@ -60,7 +81,22 @@ def main() -> int:
 
     # Create a separate grayscale array.
     grayscale_image = to_grayscale(image)
-    binary_image = binarize(grayscale_image)
+    
+    # Select the requested binarization method.
+    # Create a binary adaptive image
+    try:
+        if args.method == "adaptive":
+            binary_image = binarize_adaptive(
+                grayscale_image,
+                block_size=args.block_size,
+                c=args.c,
+            )
+        else:
+            binary_image = binarize(grayscale_image)
+    except ValueError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+
     # NumPy stores image dimensions in height, width order.
     height, width = image.shape[:2]
     print(f"Grayscale shape: {grayscale_image.shape}")
