@@ -5,7 +5,9 @@ their configuration, tokenizer and weights remain aligned.
 """
 
 import torch
+import numpy as np
 
+from numpy.typing import NDArray
 from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 
 
@@ -65,3 +67,32 @@ def load_recognizer() -> tuple[TrOCRProcessor, VisionEncoderDecoderModel]:
     model.eval()
 
     return processor, model
+
+
+def recognize_line(
+    image: NDArray[np.uint8],
+    processor: TrOCRProcessor,
+    model: VisionEncoderDecoderModel,
+) -> str:
+    """Recognize text in a cropped RGB line image."""
+    # Prepare the RGB image and move its tensor to the model device.
+    pixel_values = processor(
+        images=image,
+        return_tensors="pt",
+    ).pixel_values.to(model.device)
+
+    # Generate token IDs without tracking gradients.
+    with torch.inference_mode():
+        generated_ids = model.generate(
+            pixel_values,
+            max_new_tokens=256,
+            do_sample=False,
+        )
+
+    # Convert the first prediction to text and remove special tokens.
+    text = processor.batch_decode(
+        generated_ids,
+        skip_special_tokens=True,
+    )[0]
+
+    return text.strip()

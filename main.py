@@ -23,7 +23,7 @@ def main() -> int:
     Notes
     -----
     OCR preparation saves an RGB crop and loads the pinned model.
-    Text recognition and Markdown export are not implemented yet.
+    Line recognition is optional. Markdown export is not implemented yet.
     """
     parser = argparse.ArgumentParser(
         description="Preprocess an image or prepare a text line for OCR."
@@ -75,6 +75,12 @@ def main() -> int:
         help="Prepare a line image and load OCR resources.",
     )
 
+    parser.add_argument(
+        "--recognize-line",
+        action="store_true",
+        help="Recognize the cropped line after OCR preparation.",
+    )
+
     # Require four coordinates in the EXIF-oriented image coordinate system.
     parser.add_argument(
         "--crop",
@@ -92,6 +98,10 @@ def main() -> int:
 
     # Parse command-line arguments into named values.
     args = parser.parse_args()
+
+    # Recognition requires the crop and model created during preparation.
+    if args.recognize_line and not args.prepare_ocr:
+        parser.error("--recognize-line requires --prepare-ocr.")
 
     # Reject incomplete preparation settings before accessing files.
     if args.prepare_ocr:
@@ -157,11 +167,16 @@ def main() -> int:
 
         # Load OCR dependencies after validating and saving the line image.
         try:
-            from recognize import MODEL_ID, MODEL_REVISION, load_recognizer
+            from recognize import (
+                MODEL_ID,
+                MODEL_REVISION,
+                load_recognizer,
+                recognize_line,
+            )
 
             processor, model = load_recognizer()
         except (OSError, ValueError, RuntimeError) as error:
-            # Report expected loading failures through the CLI error channel.
+            # Report expected loading failures through the CLI error channel
             print(
                 f"Error: cannot load OCR resources: {error}",
                 file=sys.stderr,
@@ -175,6 +190,18 @@ def main() -> int:
         print(f"Evaluation mode: {not model.training}")
         print("OCR resources ready.")
 
+        if args.recognize_line:
+            try:
+                # Reuse the RGB crop and the loaded model.
+                text = recognize_line(line_image, processor, model)
+            except (ValueError, RuntimeError) as error:
+                print(
+                    f"Error: cannot recognize line: {error}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            print(f"Recognized text: {text}")
         return 0
 
     # Create a separate grayscale array.

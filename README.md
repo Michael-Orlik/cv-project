@@ -7,7 +7,8 @@ orientation and composites transparency over a white background.
 It converts images to RGB and grayscale arrays and displays their metadata.
 It can also export a binary PNG using Otsu or adaptive Gaussian thresholding.
 
-Handwriting recognition and Markdown export are planned for later stages.
+The application can recognize a manually cropped English handwritten line.
+Markdown export is planned for a later stage.
 
 ## Requirements
 
@@ -108,7 +109,18 @@ Later runs reuse cached files.
 This checkpoint is intended for English handwritten text lines.
 Successful preparation ends with `OCR resources ready.`
 
-Text recognition and Markdown export are planned for the next stage.
+## Line recognition
+
+Add `--recognize-line` to recognize the prepared RGB crop:
+
+```bash
+uv run python main.py note.jpg result.md --prepare-ocr --recognize-line \
+    --crop 145 50 1800 185 --line-output output/line.png
+```
+
+The recognized text is printed after `Recognized text:`.
+Recognition may contain errors, including missing punctuation.
+Markdown export is planned for a later stage.
 
 ## Tests
 
