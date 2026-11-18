@@ -9,8 +9,3 @@ dependencies = [
     "torch>=2.15.0",
     "transformers>=5.23.0",
 ]
-
-[dependency-groups]
-dev = [
-    "pytest>=9.2.0",
-]

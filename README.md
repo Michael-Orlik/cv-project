@@ -25,7 +25,7 @@ uv sync --locked
 ```
 
 This prepares the `.venv` environment and installs the dependencies
-recorded in `uv.lock`, including development tools.
+recorded in `uv.lock`.
 
 ## Usage
 
@@ -184,11 +184,3 @@ list, and paragraph reconstruction is not implemented. Review the text before
 using it; short lines can be missed and characters can be misrecognized.
 Image processing or file errors are reported on stderr with exit code 1.
 Invalid CLI arguments use exit code 2; successful runs use exit code 0.
-
-## Tests
-
-Run all tests from the project root:
-
-```bash
-uv run python -m pytest
-```
