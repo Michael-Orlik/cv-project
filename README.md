@@ -9,7 +9,7 @@ It can also export a binary PNG using Otsu or adaptive Gaussian thresholding.
 
 The application can recognize English handwritten lines, either manually
 cropped or detected automatically on a single-column page.
-Markdown export is planned for a later stage.
+Recognized lines are saved to the requested Markdown path.
 
 ## Requirements
 
@@ -35,10 +35,17 @@ Display the command-line help:
 uv run python main.py --help
 ```
 
-Provide an existing image and a path for the future Markdown output:
+Recognize a single-column page and save the text:
 
 ```bash
-uv run python main.py note.jpg result.md
+uv run python main.py note.jpg output/result.md \
+    --segment-page --recognize-page --lines-output output/lines
+```
+
+Inspect image metadata without recognition:
+
+```bash
+uv run python main.py note.jpg output/result.md
 ```
 
 Example output for an image with width 1200 and height 800:
@@ -47,7 +54,7 @@ Example output for an image with width 1200 and height 800:
 Grayscale shape: (800, 1200)
 RGB shape: (800, 1200, 3)
 Input image: note.jpg
-Output Markdown: result.md
+Output Markdown: output/result.md
 Image size: 1200 x 800
 RGB dtype: uint8
 ```
@@ -57,7 +64,7 @@ RGB dtype: uint8
 Save a binary version of an image with black foreground and white background.
 
 ```bash
-uv run python main.py note.jpg result.md --binary-output output/binary.png
+uv run python main.py note.jpg output/result.md --binary-output output/binary.png
 ```
 
 The parent directory is created as needed. The program reports the saved path.
@@ -71,7 +78,7 @@ Inspect the result before using it for text-line segmentation.
 Use local Gaussian thresholds to process an image with uneven lighting.
 
 ```bash
-uv run python main.py note.jpg result.md --method adaptive \
+uv run python main.py note.jpg output/result.md --method adaptive \
     --block-size 51 --c 10 --binary-output output/adaptive.png
 ```
 
@@ -90,7 +97,7 @@ still appear in the output.
 Crop one RGB text line and load the TrOCR processor and model:
 
 ```bash
-uv run python main.py note.jpg result.md --prepare-ocr \
+uv run python main.py note.jpg output/result.md --prepare-ocr \
     --crop 145 50 1800 185 --line-output output/line.png
 ```
 
@@ -98,11 +105,12 @@ Choose crop coordinates for your image after EXIF orientation.
 The order is left, top, right, bottom; right and bottom are exclusive.
 Inspect the saved PNG to confirm that the complete line is visible.
 
-The first run downloads checkpoint files to the Hugging Face cache.
-Later runs reuse cached files.
+The first run downloads approximately 2.23 GB of model weights to the
+standard Hugging Face cache, outside the project directory.
+Later runs reuse cached files. Model weights are not stored in Git.
 
-- Model: `microsoft/trocr-base-handwritten`
-- Revision: `eaacaf452b06415df8f10bb6fad3a4c11e609406`
+- Model: `microsoft/trocr-large-handwritten`
+- Revision: `e68501f437cd2587ae5d68ee457964cac824ddee`
 - Device: CPU
 - Model dtype: float32
 - Evaluation mode enabled
@@ -115,20 +123,20 @@ Successful preparation ends with `OCR resources ready.`
 Add `--recognize-line` to recognize the prepared RGB crop:
 
 ```bash
-uv run python main.py note.jpg result.md --prepare-ocr --recognize-line \
+uv run python main.py note.jpg output/result.md --prepare-ocr --recognize-line \
     --crop 145 50 1800 185 --line-output output/line.png
 ```
 
 The recognized text is printed after `Recognized text:`.
 Recognition may contain errors, including missing punctuation.
-Markdown export is planned for a later stage.
+Recognized lines are saved to the requested Markdown path.
 
 ## Page segmentation
 
 Detect candidate text lines and save their RGB crops:
 
 ```bash
-uv run python main.py note.jpg result.md \
+uv run python main.py note.jpg output/result.md \
     --segment-page --lines-output output/lines
 ```
 
@@ -150,7 +158,7 @@ This mode saves images only.
 Recognize the detected lines using one model loaded for the whole page:
 
 ```bash
-uv run python main.py note.jpg result.md \
+uv run python main.py note.jpg output/result.md \
     --segment-page --recognize-page --lines-output output/lines
 ```
 
@@ -159,7 +167,23 @@ current run are recognized; existing files in the output directory are not
 used as input. Review the text against the source image, especially numbers,
 punctuation, short lines, and handwritten corrections.
 
-Markdown export is planned for a later stage.
+Recognized lines are saved to the requested Markdown path.
+
+## Markdown output
+
+`--recognize-page` and `--recognize-line` write recognized text in UTF-8,
+with one recognized line per source line and a final newline. Service messages
+and line numbers are printed to the terminal only.
+
+Missing parent directories are created. Existing output files are overwritten.
+If no text lines are detected, page recognition saves an empty file without
+loading the model. The Markdown destination must differ from the input image.
+
+The file contains OCR predictions as returned by the model. Automatic heading,
+list, and paragraph reconstruction is not implemented. Review the text before
+using it; short lines can be missed and characters can be misrecognized.
+Image processing or file errors are reported on stderr with exit code 1.
+Invalid CLI arguments use exit code 2; successful runs use exit code 0.
 
 ## Tests
 

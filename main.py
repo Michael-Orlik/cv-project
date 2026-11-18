@@ -1,34 +1,44 @@
 import argparse
 import sys
+from pathlib import Path
+
 import cv2
 
-from pathlib import Path
 from image_io import load_image, save_image
 from image_ops import crop_image, to_grayscale
 from preprocessing import binarize, binarize_adaptive
 from segment import find_line_boxes
 
 
+def save_markdown(lines: list[str], path: Path) -> None:
+    """Save recognized lines as UTF-8 Markdown text.
+
+    Raises:
+        OSError: If the destination directory or file cannot be written.
+    """
+
+    # Join recognized lines in their reading order.
+    content = "\n".join(lines)
+    if content:
+        content += "\n"
+
+    # Create the destination directory if it does not exist.
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Write the text using an explicit encoding.
+    path.write_text(content, encoding="utf-8")
+
+
 def main() -> int:
-    """Run image preprocessing, page segmentation, or line recognition.
+    """Run image processing or OCR with Markdown output.
 
-    Returns
-    -------
-    int
-        0 on success or 1 when an image operation or model loading fails.
+    Return 0 on success or 1 if processing, recognition, or saving fails.
 
-    Raises
-    ------
-    SystemExit
-        If argparse displays help (0) or rejects command-line arguments (2).
-
-    Notes
-    -----
-    OCR preparation saves an RGB crop and loads the pinned model.
-    Line recognition is optional. Markdown export is not implemented yet.
+    Raises:
+        SystemExit: If argparse displays help (0) or rejects arguments (2).
     """
     parser = argparse.ArgumentParser(
-        description="Preprocess images, segment a page, or recognize a text line."
+        description="Preprocess images, segment pages, or save OCR text as Markdown."
     )
 
     # Positional arguments are assigned in the order they are declared.
@@ -40,6 +50,7 @@ def main() -> int:
 
     parser.add_argument(
         "output_md",
+        type=Path,
         help="Path to the output Markdown file.",
     )
 
@@ -169,6 +180,22 @@ def main() -> int:
         )
         return 1
 
+    if args.recognize_page or args.recognize_line:
+        try:
+            # Protect the source image from being overwritten by text.
+            if args.output_md.exists() and args.output_md.samefile(
+                args.input_image
+            ):
+                raise ValueError(
+                    "Markdown output must differ from the input image."
+                )
+        except (OSError, ValueError) as error:
+            print(
+                f"Error: invalid Markdown destination: {error}",
+                file=sys.stderr,
+            )
+            return 1
+
     if args.segment_page:
         try:
             boxes = find_line_boxes(image)
@@ -203,7 +230,17 @@ def main() -> int:
 
         if args.recognize_page:
             if not boxes:
+                try:
+                    save_markdown([], args.output_md)
+                except OSError as error:
+                    print(
+                        f"Error: cannot save Markdown: {error}",
+                        file=sys.stderr,
+                    )
+                    return 1
+
                 print("No text lines found.")
+                print(f"Markdown saved: {args.output_md}")
                 return 0
 
             try:
@@ -247,6 +284,18 @@ def main() -> int:
                 print(f"Line {index}: {text}")
 
             print(f"Recognized lines: {len(recognized_lines)}")
+
+            # Save the page text after all detected lines have been recognized.
+            try:
+                save_markdown(recognized_lines, args.output_md)
+            except OSError as error:
+                print(
+                    f"Error: cannot save Markdown: {error}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            print(f"Markdown saved: {args.output_md}")
 
         return 0
 
@@ -318,6 +367,17 @@ def main() -> int:
                 return 1
 
             print(f"Recognized text: {text}")
+
+            try:
+                save_markdown([text], args.output_md)
+            except OSError as error:
+                print(
+                    f"Error: cannot save Markdown: {error}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            print(f"Markdown saved: {args.output_md}")
         return 0
 
     # Create a separate grayscale array.

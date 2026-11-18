@@ -4,47 +4,31 @@ The processor and model must use the same checkpoint revision so that
 their configuration, tokenizer and weights remain aligned.
 """
 
-import torch
 import numpy as np
-
+import torch
 from numpy.typing import NDArray
 from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 
 
 # Checkpoint selected for the initial handwritten-line experiment.
-MODEL_ID = "microsoft/trocr-base-handwritten"
+MODEL_ID = "microsoft/trocr-large-handwritten"
 
 # Pin an exact model repository commit for reproducible loading.
-MODEL_REVISION = "eaacaf452b06415df8f10bb6fad3a4c11e609406"
+MODEL_REVISION = "e68501f437cd2587ae5d68ee457964cac824ddee"
 
 # Use CPU as the baseline device for the first verified implementation.
 DEVICE = "cpu"
 
 
 def load_recognizer() -> tuple[TrOCRProcessor, VisionEncoderDecoderModel]:
-    """Load the pinned TrOCR processor and model for CPU inference.
+    """Load the pinned processor and float32 model on CPU in evaluation mode.
 
-    Returns
-    -------
-    processor: TrOCRProcessor
-        Image processor and tokenizer from the pinned checkpoint.
-    model: VisionEncoderDecoderModel
-        Float32 model placed on DEVICE and configured for evaluation.
+    Checkpoint files are reused from the Hugging Face cache.
 
-    Raises
-    ------
-    OSError
-        If checkpoint files cannot be retrieved or read.
-    ValueError
-        If the checkpoint configuration is incompatible with the loader.
-    RuntimeError
-        If PyTorch fails to initialize or place the model parameters.
-
-    Notes
-    -----
-    The first call may download checkpoint files to the Hugging Face cache.
-    Both resources use MODEL_REVISION to keep their artifacts aligned.
-    Call this function once per preparation run and reuse its results.
+    Raises:
+        OSError: If checkpoint files cannot be downloaded or read.
+        ValueError: If the checkpoint configuration is incompatible.
+        RuntimeError: If PyTorch cannot initialize the model.
     """
     # Load preprocessing and tokenization settings from the pinned revision.
     processor = TrOCRProcessor.from_pretrained(
@@ -52,12 +36,12 @@ def load_recognizer() -> tuple[TrOCRProcessor, VisionEncoderDecoderModel]:
         revision=MODEL_REVISION,
     )
 
-    # Load matching weights with an explicit dtype and serialization format.
+    # This checkpoint provides PyTorch weights in pytorch_model.bin.
     model = VisionEncoderDecoderModel.from_pretrained(
         MODEL_ID,
         revision=MODEL_REVISION,
         dtype=torch.float32,
-        use_safetensors=True,
+        use_safetensors=False,
     )
 
     # Place the model on the baseline device used by this implementation.
@@ -87,6 +71,7 @@ def recognize_line(
             pixel_values,
             max_new_tokens=256,
             do_sample=False,
+            num_beams=1,
         )
 
     # Convert the first prediction to text and remove special tokens.
