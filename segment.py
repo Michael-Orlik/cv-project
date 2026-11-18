@@ -243,10 +243,11 @@ def expand_line_bands(
 def resolve_band_overlaps(
     bands: list[tuple[int, int]],
     smoothed_density: NDArray[np.float64],
+    original_bands: list[tuple[int, int]],
 ) -> list[tuple[int, int]]:
-    """Split overlapping bands at the lowest density within their overlap.
+    """Split expanded bands in the gap between the original text bands.
 
-    Bands must be ordered from top to bottom and lie within the profile.
+    Both band lists must correspond and be ordered from top to bottom.
     The resulting boundaries may still cut letter strokes.
     """
     separated_bands = bands.copy()
@@ -256,11 +257,13 @@ def resolve_band_overlaps(
         next_top, next_bottom = separated_bands[index + 1]
 
         if bottom > next_top:
-            # Search only the rows shared by the neighboring bands.
-            overlap_density = smoothed_density[next_top:bottom]
+            # Keep the separator outside both original text regions.
+            search_top = max(next_top, original_bands[index][1])
+            search_bottom = min(bottom, original_bands[index + 1][0])
+            overlap_density = smoothed_density[search_top:search_bottom]
 
             # Convert the position within the overlap to an image row.
-            boundary = next_top + int(np.argmin(overlap_density))
+            boundary = search_top + int(np.argmin(overlap_density))
 
             separated_bands[index] = (top, boundary)
             separated_bands[index + 1] = (boundary, next_bottom)
@@ -368,6 +371,7 @@ def find_line_boxes(
     separated_bands = resolve_band_overlaps(
         expanded_bands,
         smoothed_density,
+        original_bands=bands,
     )
 
     # Estimate columns from each dense text band, excluding neighboring rows.

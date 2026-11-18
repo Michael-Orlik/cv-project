@@ -410,8 +410,12 @@ def main() -> int:
 
     if args.binary_output:
         try:
+            if args.binary_output.exists() and args.binary_output.samefile(
+                args.input_image
+            ):
+                raise ValueError("Binary output must differ from input image.")
             save_image(binary_image, args.binary_output)
-        except OSError as error:
+        except (OSError, ValueError) as error:
             print(f"Error: cannot save binary image: {error}", file=sys.stderr)
             return 1
 
